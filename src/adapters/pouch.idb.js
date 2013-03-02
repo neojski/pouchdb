@@ -179,6 +179,7 @@ var IdbPouch = function(opts, callback) {
 
     function processDocs() {
       if (!docs.length) {
+        console.log("bulkDocs txn finishes");
         return;
       }
       var currentDoc = docs.shift();
@@ -270,6 +271,7 @@ var IdbPouch = function(opts, callback) {
       }
 
       function finish() {
+        console.log("bulkDocs about to put BY_SEQ_STORE");
         var dataReq = txn.objectStore(BY_SEQ_STORE).put(docInfo.data);
         dataReq.onsuccess = function(e) {
           if (Pouch.DEBUG)
@@ -345,11 +347,12 @@ var IdbPouch = function(opts, callback) {
       getReq.onerror = getReq.ontimeout = idbError(callback);
     }
 
-    var txn = idb.transaction([DOC_STORE, BY_SEQ_STORE, ATTACH_STORE, META_STORE], IDBTransaction.READ_WRITE);
+    var txn = idb.transaction([DOC_STORE, BY_SEQ_STORE, ATTACH_STORE, META_STORE],"readwrite");
     txn.onerror = idbError(callback);
     txn.ontimeout = idbError(callback);
     txn.oncomplete = complete;
 
+    console.log("bulkDocs txn started");
     processDocs();
 
   };
@@ -659,8 +662,12 @@ var IdbPouch = function(opts, callback) {
     }
 
     function fetchChanges() {
+      console.log('fetchChanges');
       txn = idb.transaction([DOC_STORE, BY_SEQ_STORE]);
       txn.oncomplete = onTxnComplete;
+
+      console.log("changes txn start");
+
       var req = descending
         ? txn.objectStore(BY_SEQ_STORE)
           .openCursor(IDBKeyRange.lowerBound(opts.since, true), descending)
@@ -671,8 +678,10 @@ var IdbPouch = function(opts, callback) {
     }
 
     function onsuccess(event) {
+      console.log('changes cursor step');
       if (!event.target.result) {
         if (opts.continuous && !opts.cancelled) {
+          console.log('register me');
           IdbPouch.Changes.addListener(name, id, api, opts);
         }
 
