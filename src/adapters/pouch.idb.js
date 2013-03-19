@@ -438,70 +438,61 @@ var IdbPouch = function(opts, callback) {
     return a._bulk_seq - b._bulk_seq;
   }
 
-  // First we look up the metadata in the ids database, then we fetch the
-  // current revision(s) from the by sequence store
-  api._internalGet = function idb_get(id, opts, callback) {
 
-    var result;
+
+
+  ///////////////////
+  // generic get
+  //////////////////
+  api._getMetadata = function(id, callback) {
+    var metadata;
     var txn = idb.transaction([DOC_STORE, BY_SEQ_STORE, ATTACH_STORE], 'readonly');
     txn.oncomplete = function() {
-      call(callback, result);
+      // the transaction started here and it will complete here
     };
 
-    var leaves;
     txn.objectStore(DOC_STORE).get(id.docId).onsuccess = function(e) {
-      var metadata = e.target.result;
-      // we can determine the result here if:
-      // 1. there is no such document
-      // 2. the document is deleted and we don't ask about specific rev
-      // When we ask with opts.rev we expect the answer to be either
-      // doc (possibly with _deleted=true) or missing error
-      if (!e.target.result || (isDeleted(metadata, opts.rev) && !opts.rev)) {
-        if (isDeleted(metadata, opts.rev)) {
-          result = extend({}, Pouch.Errors.MISSING_DOC, {reason:"deleted"});
-        } else {
-          result = Pouch.Errors.MISSING_DOC;
-        }
-        return;
-      }
-
-      var rev = Pouch.merge.winningRev(metadata);
-      var key = opts.rev ? opts.rev : rev;
-      var index = txn.objectStore(BY_SEQ_STORE).index('_rev');
-
-      index.get(key).onsuccess = function(e) {
-        var doc = e.target.result;
-        if (!doc) {
-          result = Pouch.Errors.MISSING_DOC;
-          return;
-        }
-
-        doc._metadata = metadata;
-
-        if (opts.attachments && doc._attachments) {
-          var attachments = Object.keys(doc._attachments);
-          var recv = 0;
-
-          attachments.forEach(function(key) {
-            api.getAttachment(doc._id + '/' + key, {encode: true, txn: txn}, function(err, data) {
-              doc._attachments[key].data = data;
-
-              if (++recv === attachments.length) {
-                result = doc;
-              }
-            });
-          });
-        } else {
-          if (doc._attachments){
-            for (var key in doc._attachments) {
-              doc._attachments[key].stub = true;
-            }
-          }
-          result = doc;
-        }
-      };
+      metadata = e.target.result;
+      call(callback, metadata, {txn: txn});
     };
   };
+
+  // it'll be only fired with ctx
+  api._getDocument = function(id, rev, ctx, callback) {
+    console.log('getdocument');
+    var txn = ctx.txn;
+    var index = txn.objectStore(BY_SEQ_STORE).index('_rev');
+    index.get(rev).onsuccess = function(e) {
+      var doc = e.target.result;
+
+      call(callback, doc);
+    };
+  };
+  ///////////////////
+  // end of generic get
+  ///////////////////
+
+
+//        if (opts.attachments && doc._attachments) {
+//          var attachments = Object.keys(doc._attachments);
+//          var recv = 0;
+//
+//          attachments.forEach(function(key) {
+//            api.getAttachment(doc._id + '/' + key, {encode: true, txn: txn}, function(err, data) {
+//              doc._attachments[key].data = data;
+//
+//              if (++recv === attachments.length) {
+//                result = doc;
+//              }
+//            });
+//          });
+//        } else {
+//          if (doc._attachments){
+//            for (var key in doc._attachments) {
+//              doc._attachments[key].stub = true;
+//            }
+//          }
+//          result = doc;
 
   api._getAttachment = function(id, opts, callback) {
     var result;

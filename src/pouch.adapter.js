@@ -193,6 +193,50 @@ var PouchAdapter = function(opts, callback) {
 
 
   /* Begin api wrappers. Specific functionality to storage belongs in the _[method] */
+  api._genericGet = function(id, opts, callback) {
+    customApi._getMetadata(id, function (metadata, ctx){
+      if (!metadata || (isDeleted(metadata, opts.rev) && !opts.rev)) {
+        call(callback, Pouch.Errors.MISSING_DOC);
+        return;
+      }
+      var rev = Pouch.merge.winningRev(metadata);
+      var key = opts.rev ? opts.rev : rev;
+
+
+      customApi._getDocument(id, key, ctx, function(doc){
+        var result;
+        if (!doc) {
+          return call(Pouch.Errors.MISSING_DOC);
+        }
+
+        if (opts.attachments && doc._attachments) {
+          var attachments = Object.keys(doc._attachments);
+          var recv = 0;
+
+          attachments.forEach(function(key) {
+            // FIXME: we should pass only ctx (so every adapter can pass whatever it needs to)
+            api.getAttachment(doc._id + '/' + key, {encode: true, txn: ctx.txn}, function(err, data) {
+              doc._attachments[key].data = data;
+
+              if (++recv === attachments.length) {
+                result = doc;
+              }
+            });
+          });
+        } else {
+          if (doc._attachments){
+            for (var key in doc._attachments) {
+              doc._attachments[key].stub = true;
+            }
+          }
+          result = doc;
+        }
+
+        call(callback, null, result);
+      });
+    });
+  };
+
   api.get = function (id, opts, callback) {
     if (typeof opts === 'function') {
       callback = opts;
@@ -234,11 +278,10 @@ var PouchAdapter = function(opts, callback) {
       return customApi.getAttachment(id, callback);
     }
 
-    customApi._internalGet(id, opts, function(result) {
-      if('error' in result) {
-        call(callback, result);
-        return;
-      } 
+    customApi._genericGet(id, opts, function(err, result) {
+      if(err) {
+        return call(callback, err);
+      }
       var doc = result;
       var metadata = result._metadata;
       delete result._metadata;
