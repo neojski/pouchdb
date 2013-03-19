@@ -381,7 +381,7 @@ var webSqlPouch = function(opts, callback) {
     });
   };
 
-  api._get = function(id, opts, callback) {
+  api._internalGet = function(id, opts, callback) {
     var result;
     db.transaction(function(tx) {
       var sql = 'SELECT * FROM ' + DOC_STORE + ' WHERE id=?';
@@ -405,30 +405,7 @@ var webSqlPouch = function(opts, callback) {
             return;
           }
           var doc = JSON.parse(results.rows.item(0).json);
-
-          if (opts.revs) {
-            var path = arrayFirst(rootToLeaf(metadata.rev_tree), function(arr) {
-              return arr.ids.indexOf(doc._rev.split('-')[1]) !== -1;
-            });
-            path.ids.reverse();
-            doc._revisions = {
-              start: (path.pos + path.ids.length) - 1,
-              ids: path.ids
-            };
-          }
-
-          if (opts.revs_info) {
-            doc._revs_info = metadata.rev_tree.reduce(function(prev, current) {
-              return prev.concat(collectRevs(current));
-            }, []);
-          }
-
-          if (opts.conflicts) {
-            var conflicts = collectConflicts(metadata.rev_tree, metadata.deletions);
-            if (conflicts.length) {
-              doc._conflicts = conflicts;
-            }
-          }
+          doc._metadata = metadata;
 
           if (opts.attachments && doc._attachments) {
             var attachments = Object.keys(doc._attachments);
