@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>QUnit Test Suite</title>
+    <style>
+      iframe{width: 100%}
+    </style>
+  </head>
+  <body>
+    <script>
+      var testFiles = ['test.basics.js', 'test.all_dbs.js', 'test.changes.js',
+      'test.bulk_docs.js', 'test.all_docs.js', 'test.conflicts.js',
+      'test.merge_rev_tree.js',  'test.revs_diff.js',
+      'test.replication.js', 'test.views.js',
+      'test.design_docs.js', 'test.issue221.js', 'test.http.js',
+      'test.gql.js', 'test.compaction.js', 'test.get.js'];
+
+      testFiles.forEach(function(test){
+        var iframe = document.createElement('iframe');
+        iframe.frameborder = 0;
+        iframe.onload = function() {
+          var that = this;
+          setTimeout(function(){
+            console.log(that.contentWindow.document.body.offsetHeight);
+            that.style.height = that.contentWindow.document.body.scrollHeight + 'px';
+          }, 1000);
+        };
+        iframe.src = "test.html?testFiles=" + test;
+        document.body.appendChild(iframe);
+      });
+
+    </script>
+  </body>
+</html>
+
